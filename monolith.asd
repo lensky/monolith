@@ -23,4 +23,5 @@
                                               :components ((:file "operators")
                                                            (:file "monoid-operators")
                                                            (:file "abelian-operators")
-                                                           (:file "primitive-operators")))))))
+                                                           (:file "primitive-operators")
+                                                           (:file "supplemental-operators")))))))
