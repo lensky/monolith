@@ -25,6 +25,7 @@
           (apply #'append @as))))
 
 (add-simplifier-patterns
+  ((g/* @as 0 @as) 0)
   ((g/* @as ?x @as (g/expt ?x ?y) @as)
    (apply #'g/*
           (g/expt ?x (g/+ 1 ?y))
@@ -47,6 +48,12 @@
   (make-g/expt-expr base exponent))
 (defmethod g/expt ((base number) (exponent expression))
   (make-g/expt-expr base exponent))
+
+(add-simplifier-patterns
+  ((g/expt ?x 1) ?x)
+  ((g/expt ?x 0) 1)
+  ((g/expt 1 ?x) 1)
+  ((g/expt 0 ?x) 0))
 
 ;; Inverse abelian operators
 
