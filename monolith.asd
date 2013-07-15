@@ -24,4 +24,5 @@
                                                            (:file "monoid-operators")
                                                            (:file "abelian-operators")
                                                            (:file "primitive-operators")
-                                                           (:file "supplemental-operators")))))))
+                                                           (:file "supplemental-operators")
+                                                           (:file "derivative")))))))
