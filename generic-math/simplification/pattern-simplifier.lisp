@@ -136,14 +136,15 @@
 
 (defmacro add-simplifier-patterns (&body simp-specs)
   (let ((setting-required
-         (loop for simp-spec in simp-specs
-            do (let ((expr-sym (caar simp-spec))
-                     (spec (list (cdar simp-spec) (cadr simp-spec))))
-                 (setf (gethash expr-sym *expr-pattern-specs*)
-                       (remove-duplicates
-                        (append (gethash expr-sym *expr-pattern-specs* '())
-                                (list spec)))))
-            collect (caar simp-spec))))
+         (remove-duplicates
+          (loop for simp-spec in simp-specs
+             do (let ((expr-sym (caar simp-spec))
+                      (spec (list (cdar simp-spec) (cadr simp-spec))))
+                  (setf (gethash expr-sym *expr-pattern-specs*)
+                        (remove-duplicates
+                         (append (gethash expr-sym *expr-pattern-specs* '())
+                                 (list spec)))))
+             collect (caar simp-spec)))))
     `(progn
        ,@(loop for expr-sym in setting-required
               collect `(set-pm-simplifier ',expr-sym
