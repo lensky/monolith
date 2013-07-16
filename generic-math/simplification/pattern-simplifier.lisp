@@ -69,17 +69,22 @@
                  (member (char (symbol-name x) 0)
                          (mapcar #'car *pattern-prefix->object*)))))))
 
-(defun surround-with-pat-env (symbolic-pat &rest body)
+(defun surround-with-pat-env (&rest body)
   `(let (,@(mapcar #'pattern-symbol->let-statement
-                   (get-simp-pattern-vars symbolic-pat)))
+                   (mappend (lambda (s) (get-simp-pattern-vars s)) body)))
      ,@body))
 
-(defun surround-with-match-env (symbolic-pat bindings-sym &rest body)
-  `(let (,@(mapcar (lambda (symbol)
-                     (let ((var (eval (pattern-symbol->pattern-var symbol))))
-                       `(,symbol ,(compile-get-binding-val var bindings-sym))))
-                   (get-simp-pattern-vars symbolic-pat)))
-     ,@body))
+(defun surround-with-match-env (bindings &rest body)
+  (let ((syms-to-bind (mappend (lambda (s) (get-simp-pattern-vars s)) body)))
+    (if syms-to-bind
+        (with-gensyms (bs)
+          `(let ((,bs ,bindings))
+             (let (,@(mapcar (lambda (symbol)
+                               (let ((var (eval (pattern-symbol->pattern-var symbol))))
+                                 `(,symbol ,(compile-get-binding-val var bs))))
+                             syms-to-bind))
+               ,@body)))
+        `(progn ,@body))))
 
 (defun compile-simplifier-pat (symbolic-pat)
   (eval
@@ -88,21 +93,20 @@
                   (append `(exp-pat ',(car x)) (mapcar #'add-exp-pat (cdr x)))
                   x)))
      (let ((with-exp-pat (mapcar #'add-exp-pat symbolic-pat)))
-       (surround-with-pat-env symbolic-pat `(compile-pattern (list-pat ',(gensym) ,@with-exp-pat)))))))
+       (surround-with-pat-env `(compile-pattern (list-pat ',(gensym) ,@with-exp-pat)))))))
 
 (defun single-pattern-simplifier (simp-spec auto-simplify)
   (destructuring-bind (pat action &key (auto-simplify auto-simplify)) simp-spec
     (let ((compiled-pat (compile-simplifier-pat pat)))
-      (with-gensyms (operands match bindings new-exp)
+      (with-gensyms (operands match new-exp)
         `(lambda (,operands)
            (let ((,match (funcall (funcall ,compiled-pat (single-value-matcher (list ,operands))))))
              (if (pattern-false-p ,match)
                  (cons ,operands nil)
-                 (let* ((,bindings (cdr ,match))
-                        (,new-exp ,(surround-with-match-env pat bindings action)))
+                 (let ((,new-exp ,(surround-with-match-env `(cdr ,match) action)))
                    (cons ,(if auto-simplify `(simplify-exp ,new-exp) new-exp) t)))))))))
 
-(defun make-pm-simplifier (op-fn before-simplifier after-simplifier auto-simplify simp-specs)
+(defun make-pm-simplifier (op-fn auto-simplify simp-specs)
   (compile nil
            (eval
             (with-gensyms (compiled-simps x fn-list fn res matched-p new-operands)
@@ -122,16 +126,6 @@
                        (setf ,matched-p (cdr ,res))
                        (setf ,new-operands (car ,res))))))))))
 
-(defun set-pm-simplifier (expression-sym simp-specs &optional before-simplifier after-simplifier (auto-simplify t))
-  (let* ((expression-type (expression-class expression-sym))
-         (compiled-simplifier (make-pm-simplifier (symbol-function expression-sym)
-                                before-simplifier
-                                after-simplifier
-                                auto-simplify
-                                simp-specs)))
-    (eval `(defmethod simplify-exp ((expression ,expression-type))
-             (funcall ,compiled-simplifier (operands expression))))))
-
 (defvar *expr-pattern-specs* (make-hash-table))
 
 (defmacro add-simplifier-patterns (&body simp-specs)
@@ -147,5 +141,14 @@
              collect (caar simp-spec)))))
     `(progn
        ,@(loop for expr-sym in setting-required
-              collect `(set-pm-simplifier ',expr-sym
-                         (gethash ',expr-sym *expr-pattern-specs*))))))
+            collect
+              (let ((expression-type (expression-class expr-sym)))
+                (with-gensyms (compiled-simplifier)
+                  `(let ((,compiled-simplifier '()))
+                     (defmethod simplify-exp ((expression ,expression-type))
+                       (when (null ,compiled-simplifier)
+                         (setf ,compiled-simplifier
+                               (make-pm-simplifier (symbol-function ',expr-sym)
+                                 t
+                                 (gethash ',expr-sym *expr-pattern-specs*))))
+                       (funcall ,compiled-simplifier (operands expression))))))))))

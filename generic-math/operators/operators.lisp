@@ -22,21 +22,26 @@
                                      (exp-maker t)
                                      (exp-maker-name (format-symbol *exp-maker-format* symbolic-name))
                                      (extra-exp-slots '()))
-  (add-class-name symbolic-name exp-class-name)
-  `(progn
-     (defgeneric ,gen-name ,args ,@(if docstring (list :documentation docstring)))
-     
-     (defclass ,exp-class-name (,expression-superclass)
-       ((operator :allocation :class
-                  :reader operator
-                  :initform #',operator-name
-                  :type 'function)
-        (operator-name :allocation :class
-                       :reader operator-name
-                       :initform ',symbolic-name
-                       :type 'list)
-        ,@extra-exp-slots))
+  (progn
+    (eval-when (:compile-toplevel :load-toplevel :execute)
+      (add-class-name symbolic-name exp-class-name))
+    `(progn
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         (add-class-name ',symbolic-name ',exp-class-name)
 
-     ,@(if exp-maker
-           (list `(defun ,exp-maker-name ,args
-                    (make-instance ',exp-class-name :operands (list ,@(extract-args args))))))))
+         (defgeneric ,gen-name ,args ,@(if docstring (list :documentation docstring)))
+     
+         (defclass ,exp-class-name (,expression-superclass)
+           ((operator :allocation :class
+                      :reader operator
+                      :initform #',operator-name
+                      :type 'function)
+            (operator-name :allocation :class
+                           :reader operator-name
+                           :initform ',symbolic-name
+                           :type 'list)
+            ,@extra-exp-slots)))
+
+       ,@(if exp-maker
+             (list `(defun ,exp-maker-name ,args
+                      (make-instance ',exp-class-name :operands (list ,@(extract-args args)))))))))
