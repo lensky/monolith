@@ -3,28 +3,23 @@
 (defclass abelian-expression (monoid-expression) ()
   (:documentation "Class for commutative monoidal operators with an inverse element."))
 
-(defgeneric abelian<= (x y)
+(defgeneric abelian< (x y)
   (:documentation "Used to sort arguments to abelian operators."))
 
-(defmethod abelian<= (x y) t)
+(defmethod abelian< (x y) nil)
 
-(defmethod abelian<= ((x number) y) t)
-(defmethod abelian<= (x (y number)) nil)
+(defmethod abelian< ((x number) y) t)
+(defmethod abelian< (x (y number)) nil)
 
-(defmethod abelian<= ((x expression) (y expression))
-  (string-not-greaterp (symbol-name (operator-name x))
-                       (symbol-name (operator-name y))))
-(defmethod abelian<= ((x expression) y) nil)
-(defmethod abelian<= (x (y expression)) t)
-
-(defmethod abelian<= ((x symbol) (y symbol))
-  (string-not-greaterp (symbol-name x) (symbol-name y)))
+(defun abelian<= (x y)
+  (or (abelian< x y)
+      (not (abelian< y x))))
 
 (defun sort-abelian-operands (operands)
-  (sort operands #'abelian<=))
+  (stable-sort operands #'abelian<))
 
 (defun merge-abelian-operands (op1 op2)
-  (merge 'list op1 op2 #'abelian<=))
+  (merge 'list op1 op2 #'abelian<))
 
 (defparameter *abelian-binary-format* "~a-gbin")
 
