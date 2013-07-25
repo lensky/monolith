@@ -5,12 +5,6 @@
   :depends-on ("water" "phractal")
   :serial t
   :components ((:file "packages")
-               (:module "numerics"
-                        :components ((:file "matrix")
-                                     (:file "ode")
-                                     (:file "rand")
-                                     (:file "ziggurat")
-                                     (:file "primes")))
                (:module "generic-math"
                         :serial t
                         :components ((:file "expressions")
@@ -25,4 +19,10 @@
                                                            (:file "abelian-operators")
                                                            (:file "primitive-operators")
                                                            (:file "supplemental-operators")
-                                                           (:file "derivative")))))))
+                                                           (:file "derivative")))))
+               (:file "matrix")
+               (:module "numerics"
+                        :components ((:file "ode")
+                                     (:file "rand")
+                                     (:file "ziggurat")
+                                     (:file "primes")))))
