@@ -13,6 +13,8 @@
   (* x y))
 
 (add-simplifier-patterns
+  ((g/+ @as 0 @as)
+   (apply #'g/+ (apply #'append @as)))
   ((g/+ @as ?x @as ?x @as)
    (apply #'g/+ (g/* 2 ?x) (apply #'append @as)))
   ((g/+ @as ?x @as (g/* @cs ?x @cs) @as)
@@ -26,6 +28,8 @@
 
 (add-simplifier-patterns
   ((g/* @as 0 @as) 0)
+  ((g/* @as 1 @as)
+   (apply #'g/* (apply #'append @as)))
   ((g/* @as ?x @as (g/expt ?x ?y) @as)
    (apply #'g/*
           (g/expt ?x (g/+ 1 ?y))
