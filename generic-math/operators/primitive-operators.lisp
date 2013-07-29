@@ -19,17 +19,22 @@
    (apply #'g/+ (g/* 2 ?x) (apply #'append @as)))
   ((g/+ @as ?x @as (g/* @cs ?x @cs) @as)
    (apply #'g/+
-          (g/* (apply #'g/+ 1 (apply #'append @cs)) ?x)
+          (g/* (g/+ 1 (apply #'g/* (apply #'append @cs))) ?x)
           (apply #'append @as)))
-  ((g/+ @as (g/* @cs ?x @cs) @as (g/* @cs ?x @cs) @as)
+  ((g/+ @as (g/* @cs ?x @cs) @as (g/* @ds ?x @ds) @as)
    (apply #'g/+
-          (g/* (apply #'g/+ (apply #'append @cs)) ?x)
+          (g/* (g/+ (apply #'g/* (apply #'append @cs))
+                    (apply #'g/* (apply #'append @ds))) ?x)
           (apply #'append @as))))
 
 (add-simplifier-patterns
   ((g/* @as 0 @as) 0)
   ((g/* @as 1 @as)
    (apply #'g/* (apply #'append @as)))
+  ((g/* @as ?x @as ?x @as)
+   (apply #'g/*
+          (g/expt ?x 2)
+          (apply #'append @as)))
   ((g/* @as ?x @as (g/expt ?x ?y) @as)
    (apply #'g/*
           (g/expt ?x (g/+ 1 ?y))
