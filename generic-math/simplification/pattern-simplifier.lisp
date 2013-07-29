@@ -132,12 +132,19 @@
   (let ((setting-required
          (remove-duplicates
           (loop for simp-spec in simp-specs
-             do (let ((expr-sym (caar simp-spec))
-                      (spec (list (cdar simp-spec) (cadr simp-spec))))
-                  (setf (gethash expr-sym *expr-pattern-specs*)
-                        (remove-duplicates
-                         (append (gethash expr-sym *expr-pattern-specs* '())
-                                 (list spec)))))
+             do (let* ((expr-sym (caar simp-spec))
+                       (pat (cdar simp-spec))
+                       (action (cdr simp-spec))
+                       (spec (append (list pat) action)))
+                  (let* ((present (assoc pat (gethash expr-sym *expr-pattern-specs*) :test #'equalp)))
+                    (if present
+                        (setf (cdr (assoc pat
+                                          (gethash expr-sym *expr-pattern-specs*)
+                                          :test #'equalp))
+                              action)
+                        (setf (gethash expr-sym *expr-pattern-specs*)
+                              (append (gethash expr-sym *expr-pattern-specs* '())
+                                      (list spec))))))
              collect (caar simp-spec)))))
     `(progn
        ,@(loop for expr-sym in setting-required
