@@ -20,6 +20,14 @@
              :initarg :elements
              :type (simple-array number))))
 
+(defun make-array-matrix (rows cols &key (element-type 'number) (initial-contents nil))
+  (let ((dimensions (if (= 1 cols)
+                        (list rows)
+                        (list rows cols))))
+    (if initial-contents
+        (make-array dimensions :element-type element-type :initial-contents initial-contents)
+        (make-array dimensions :element-type element-type))))
+
 (defun make-matrix (rows cols &key
                                 (element-type t)
                                 (initial-contents nil)
@@ -35,33 +43,35 @@
               (t (if numeric 'numeric-matrix 'matrix)))))
          (array
           (if construct-array
-              (let* ((dimensions (cond (row-p (list cols))
-                                       (col-p (list rows))
-                                       (t (list cols rows))))
-                     (initial-contents (let ((init-ds (dimensions initial-contents)))
-                                         (cond ((equalp init-ds dimensions) initial-contents)
-                                               ((and (not (null (cdr dimensions)))
-                                                     (null (cdr init-ds)))
-                                                (list initial-contents))
-                                               ((and (null (cdr dimensions))
-                                                     (not (null (cdr init-ds))))
-                                                (if (= 1 (cols initial-contents))
-                                                    (cond
-                                                      ((typep initial-contents 'sequence)
-                                                       (map 'list (lambda (x) (elt x 0)) initial-contents))
-                                                      ((typep initial-contents 'array)
-                                                       (iter (for i from 0 to (1- (rows initial-contents)))
-                                                             (collect (aref initial-contents i 0)))))
-                                                    (elt initial-contents 0)))))))
+              (let ((dimensions (cond (row-p (list cols))
+                                      (col-p (list rows))
+                                      (t (list rows cols)))))
                 (cond
                   ((null initial-contents)
                    (make-array dimensions
                                :element-type element-type
                                :initial-element initial-element))
                   (t
-                   (make-array dimensions
-                               :element-type element-type
-                               :initial-contents initial-contents))))
+                   (let ((initial-contents (let ((init-ds (dimensions initial-contents)))
+                                             (cond ((equalp init-ds dimensions) initial-contents)
+                                                   ((and (not (null (cdr dimensions)))
+                                                         (null (cdr init-ds)))
+                                                    (list initial-contents))
+                                                   ((and (null (cdr dimensions))
+                                                         (not (null (cdr init-ds))))
+                                                    (if (= 1 (cols initial-contents))
+                                                        (cond
+                                                          ((typep initial-contents 'sequence)
+                                                           (map 'list (lambda (x) (elt x 0)) initial-contents))
+                                                          ((typep initial-contents 'array)
+                                                           (iter (for i from 0 to (1- (rows initial-contents)))
+                                                                 (collect (aref initial-contents i 0)))))
+                                                        (elt initial-contents 0)))))))
+                     (if (typep initial-contents 'array)
+                         initial-contents
+                         (make-array dimensions
+                                     :element-type element-type
+                                     :initial-contents initial-contents))))))
               initial-contents)))
     (make-instance class :elements array :element-type element-type)))
 
@@ -113,11 +123,14 @@
 (defmethod matrix-row ((matrix array) row)
   (let ((cols (cols matrix)))
     (make-array cols
+                :element-type (element-type matrix)
                 :displaced-to matrix
                 :displaced-index-offset (* cols row))))
 
 (defmethod matrix-row ((matrix matrix) row)
-  (sequence->matrix (matrix-row (elements matrix) row) :construct-array nil))
+  (sequence->matrix (matrix-row (elements matrix) row)
+                    :construct-array nil
+                    :element-type (element-type matrix)))
 
 (defmethod (setf matrix-row) (entries matrix row)
   (if (col-matrix-p matrix)
@@ -136,11 +149,12 @@
 (defmethod matrix-col ((matrix array) col)
   (let ((rows (rows matrix)))
     (make-array rows
+                :element-type (element-type matrix)
                 :initial-contents
                 (loop for row from 0 to (1- rows) collect (matrix-ij matrix row col)))))
 
 (defmethod matrix-col ((matrix matrix) col)
-  (sequence->matrix (matrix-col (elements matrix) col) :construct-array nil))
+  (sequence->matrix (matrix-col (elements matrix) col) :construct-array nil :element-type (element-type matrix)))
 
 (defmethod (setf matrix-col) (entries (matrix matrix) col)
   (if (row-matrix-p matrix)
@@ -209,6 +223,16 @@
 
 (defmethod transpose (s) s)
 
+(defmethod transpose ((a array))
+  (let* ((rs (rows a))
+         (cs (cols a))
+         (result (make-array-matrix cs rs)))
+    (loop for i from 0 to (1- rs)
+       do (loop for j from 0 to (1- cs)
+             do (setf (matrix-ij result j i)
+                      (matrix-ij a i j))))
+    result))
+
 (defmethod transpose ((m matrix))
   (let* ((rs (rows m))
          (cs (cols m))
@@ -222,6 +246,11 @@
 (defmethod transpose ((m row-matrix))
   (make-matrix (cols m) 1 :element-type (element-type m) :initial-contents (elements m) :construct-array nil))
 (defmethod transpose ((m col-matrix))
+  (make-matrix 1 (rows m) :element-type (element-type m) :initial-contents (elements m) :construct-array nil))
+
+(defmethod transpose ((m numeric-row-matrix))
+  (make-matrix (cols m) 1 :element-type (element-type m) :initial-contents (elements m) :construct-array nil))
+(defmethod transpose ((m numeric-col-matrix))
   (make-matrix 1 (rows m) :element-type (element-type m) :initial-contents (elements m) :construct-array nil))
 
 (defmacro-driver (FOR var AS-INDEX dimensions)
@@ -244,11 +273,11 @@
 
 (defun apply-elementwise (result-maker result-accumulator selector fn seq &rest seqs)
   (let* ((d1 (dimensions seq))
-         (acc (lambda (passed-val accum)
+         (acc (lambda (passed-val accumulated)
                 (let ((val (car passed-val))
                       (is (cdr passed-val))
-                      (accum (or accum (funcall result-maker seq d1))))
-                  (apply result-accumulator accum val is)))))
+                      (accumulated (or accumulated (funcall result-maker seq d1))))
+                  (apply result-accumulator accumulated val is)))))
     (iter (for is as-index d1)
           (for x1 = (apply selector seq is))
           (for xs = (if seqs (mapcar (lambda (s) (apply selector s is)) seqs)))
@@ -339,8 +368,8 @@
 
 (defmethod g/*-gbin ((m1 numeric-matrix) (m2 numeric-matrix))
     (sequence->matrix
-     (inner m1 m2 #'* #'+)
-     :element-type 'double-float))
+     (inner (elements m1) (elements m2) #'* #'+)
+     :element-type 'number))
 
 (defmethod g/*-gbin ((m1 row-matrix) (m2 col-matrix))
   (reduce #'g/+ (map 'list #'g/* (elements m1) (elements m2))))
@@ -360,4 +389,4 @@
                       (iter (for i from 0 to (1- (cols m1)))
                             (collect (matrix-ij m1 0 i)))
                       (elements m2))))
-    (t (inner (elements m1) (elements m2) #'* #'+))))
+    (t (inner m1 m2 #'* #'+))))
