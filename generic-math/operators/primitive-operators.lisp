@@ -21,6 +21,10 @@
    (apply #'g/+
           (g/* (g/+ 1 (apply #'g/* (apply #'append @cs))) ?x)
           (apply #'append @as)))
+  ((g/+ @as (g/* @cs ?x @cs) @as ?x @as)
+   (apply #'g/+
+          (g/* (g/+ 1 (apply #'g/* (apply #'append @cs))) ?x)
+          (apply #'append @as)))
   ((g/+ @as (g/* @cs ?x @cs) @as (g/* @ds ?x @ds) @as)
    (apply #'g/+
           (g/* (g/+ (apply #'g/* (apply #'append @cs))
@@ -36,6 +40,10 @@
           (g/expt ?x 2)
           (apply #'append @as)))
   ((g/* @as ?x @as (g/expt ?x ?y) @as)
+   (apply #'g/*
+          (g/expt ?x (g/+ 1 ?y))
+          (apply #'append @as)))
+  ((g/* @as (g/expt ?x ?y) @as ?x @as)
    (apply #'g/*
           (g/expt ?x (g/+ 1 ?y))
           (apply #'append @as)))
@@ -62,7 +70,9 @@
   ((g/expt ?x 1) ?x)
   ((g/expt ?x 0) 1)
   ((g/expt 1 ?x) 1)
-  ((g/expt 0 ?x) 0))
+  ((g/expt 0 ?x) 0)
+  ((g/expt (g/expt ?x ?y) ?z)
+   (g/expt ?x (g/* ?y ?z))))
 
 ;; Inverse abelian operators
 
