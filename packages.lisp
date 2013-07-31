@@ -1,4 +1,5 @@
 (defpackage #:monolith
   (:use #:cl
         #:water
-        #:phractal))
+        #:phractal
+        #:iterate))
