@@ -30,25 +30,28 @@
    '(5179/57600 0 7571/16695 393/640 -92097/339200 187/2100 1/40)))
 
 (defun rk-ks (f ti yi as cs step)
-  (let* ((nks (length as))
+  (let* ((nks (rows as))
          (nys (rows yi))
-         (ks (make-matrix nks nys :element-type 'double-float)))
+         (dimensions (if (<= nys 1)
+                         (list nks)
+                         (list nks nys)))
+         (ks (make-array dimensions
+                         :initial-element 0.0d0
+                         :element-type 'double-float)))
     (loop for i from 0 to (1- nks)
        for a = (elt as i)
        for c = (aref cs i)
-       for ki = (m* step
-                    (funcall
-                     f
-                     (+ ti (* step c))
-                     (m+ yi (m* (transpose ks) a))))
-       do (if (zerop nys)
-              (setf (aref ks i) ki)
-              (loop for j from 0 to (1- nys)
-                   do (setf (aref ks i j) (aref ki j)))))
+       for ki = (g/* step
+                     (funcall
+                      f
+                      (+ ti (* step c))
+                      (g/+ yi (g/* (transpose ks) a))))
+       do
+         (setf (matrix-row ks i) ki))
     (transpose ks)))
 
 (defun rk-step (yi bs ks)
-  (m+ yi (m* ks bs)))
+  (g/+ yi (g/* ks bs)))
 
 (defun adjust-rk-step (step err tol order)
   (if (= 0 err)
@@ -59,7 +62,7 @@
   (let* ((ks (rk-ks f ti yi +dp-as+ +dp-cs+ step))
          (y-4 (rk-step yi +dp-b+ ks))
          (y-5 (rk-step yi +dp-bhat+ ks))
-         (err (let ((errs (m- y-4 y-5)))
+         (err (let ((errs (g/- y-4 y-5)))
                 (if (null ds)
                     (abs errs)
                     (reduce (lambda (a b) (max a (abs b))) errs :initial-value 0.0d0))))
