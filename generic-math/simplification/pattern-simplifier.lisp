@@ -127,35 +127,36 @@
                        (setf ,new-operands (car ,res))))))))))
 
 (defvar *expr-pattern-specs* (make-hash-table))
+(defvar *expr-compiled-pattern-simplifiers* (make-hash-table))
+
+(defun pattern-simplifier (expression)
+  (gethash (operator-name expression) *expr-compiled-pattern-simplifiers* nil))
+
+(defmethod simplify-exp :around ((expression expression))
+  (setf (operands expression) (mapcar #'simplify-exp (operands expression)))
+  (let ((simplified (call-next-method)))
+    (let ((pattern-simplifier (pattern-simplifier simplified)))
+      (if pattern-simplifier
+          (funcall pattern-simplifier (operands simplified))
+          simplified))))
+
+(defun add-patterns-to-table (hash-table specs)
+  (iter (for ((expr-sym . pat) . action-spec) in specs)
+        (let ((present (assoc pat (gethash expr-sym hash-table) :test #'equalp)))
+          (if present
+              (setf (cdr present) action-spec)
+              (setf (gethash expr-sym hash-table)
+                    (append (gethash expr-sym hash-table '())
+                            (list (cons pat action-spec))))))
+        (adjoining expr-sym)))
 
 (defmacro add-simplifier-patterns (&body simp-specs)
-  (let ((setting-required
-         (remove-duplicates
-          (loop for simp-spec in simp-specs
-             do (let* ((expr-sym (caar simp-spec))
-                       (pat (cdar simp-spec))
-                       (action (cdr simp-spec))
-                       (spec (append (list pat) action)))
-                  (let* ((present (assoc pat (gethash expr-sym *expr-pattern-specs*) :test #'equalp)))
-                    (if present
-                        (setf (cdr (assoc pat
-                                          (gethash expr-sym *expr-pattern-specs*)
-                                          :test #'equalp))
-                              action)
-                        (setf (gethash expr-sym *expr-pattern-specs*)
-                              (append (gethash expr-sym *expr-pattern-specs* '())
-                                      (list spec))))))
-             collect (caar simp-spec)))))
-    `(progn
-       ,@(loop for expr-sym in setting-required
-            collect
-              (let ((expression-type (expression-class expr-sym)))
-                (with-gensyms (compiled-simplifier)
-                  `(let ((,compiled-simplifier '()))
-                     (defmethod simplify-exp ((expression ,expression-type))
-                       (when (null ,compiled-simplifier)
-                         (setf ,compiled-simplifier
-                               (make-pm-simplifier (symbol-function ',expr-sym)
-                                 t
-                                 (gethash ',expr-sym *expr-pattern-specs*))))
-                       (funcall ,compiled-simplifier (operands expression))))))))))
+  `(let ((recompile-required
+          (add-patterns-to-table *expr-pattern-specs* ',simp-specs)))
+     (iter (for expr-sym in recompile-required)
+           (let ((expression-type (expression-class expr-sym)))
+             (let ((compiled-simplifier
+                    (make-pm-simplifier (symbol-function expr-sym)
+                                        t
+                                        (gethash expr-sym *expr-pattern-specs*))))
+               (setf (gethash expr-sym *expr-compiled-pattern-simplifiers*) compiled-simplifier))))))
