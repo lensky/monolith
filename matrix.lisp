@@ -6,14 +6,13 @@
   (array-element-type array))
 
 (defclass matrix ()
-
   ((elements :accessor elements
              :initarg :elements)
    (element-type :accessor element-type
                  :initarg :element-type)))
 
 (defmethod print-object ((matrix matrix) stream)
-  (format stream "~a" (elements matrix)))
+  (format stream "[~a]" (elements matrix)))
 
 (defclass numeric-matrix (matrix)
   ((elements :accessor elements
