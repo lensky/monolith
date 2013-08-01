@@ -132,14 +132,6 @@
 (defun pattern-simplifier (expression)
   (gethash (operator-name expression) *expr-compiled-pattern-simplifiers* nil))
 
-(defmethod simplify-exp :around ((expression expression))
-  (setf (operands expression) (mapcar #'simplify-exp (operands expression)))
-  (let ((simplified (call-next-method)))
-    (let ((pattern-simplifier (pattern-simplifier simplified)))
-      (if pattern-simplifier
-          (funcall pattern-simplifier (operands simplified))
-          simplified))))
-
 (defun add-patterns-to-table (hash-table specs)
   (iter (for ((expr-sym . pat) . action-spec) in specs)
         (let ((present (assoc pat (gethash expr-sym hash-table) :test #'equalp)))
@@ -160,3 +152,16 @@
                                         t
                                         (gethash expr-sym *expr-pattern-specs*))))
                (setf (gethash expr-sym *expr-compiled-pattern-simplifiers*) compiled-simplifier))))))
+
+(defmethod simplify-exp :around ((expression expression))
+  (let ((new-expression
+         (apply (operator expression)
+                (mapcar #'simplify-exp (operands expression)))))
+    (if (eq (class-of new-expression)
+            (class-of expression))
+        (let* ((simplified (call-next-method new-expression))
+               (pattern-simplifier (pattern-simplifier simplified)))
+          (if pattern-simplifier
+              (funcall pattern-simplifier (operands simplified))
+              simplified))
+        (simplify-exp new-expression))))

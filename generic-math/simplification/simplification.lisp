@@ -5,6 +5,10 @@
 
 (defmethod simplify-exp (x) x)
 
-(defmethod simplify-exp :around ((exp expression))
-  (setf (operands exp) (mapcar #'simplify-exp (operands exp)))
-  (call-next-method exp))
+(defmethod simplify-exp :around ((expression expression))
+  (let ((new-expression (apply (operator expression)
+                               (mapcar #'simplify-exp (operands expression)))))
+    (if (eq (class-of new-expression)
+            (class-of expression))
+        (call-next-method new-expression)
+        (simplify-exp new-expression))))

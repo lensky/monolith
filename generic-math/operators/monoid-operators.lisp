@@ -11,8 +11,7 @@
        (cond
          ((null new-operands) identity-value)
          ((null (cdr new-operands)) (car new-operands))
-         (t (setf (operands expression) new-operands)
-            (call-next-method expression)))))))
+         (t (call-next-method (apply (operator expression) new-operands))))))))
 
 (defgeneric identity-value (object))
 
