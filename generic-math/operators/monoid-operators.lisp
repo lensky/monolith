@@ -16,29 +16,58 @@
 
 (defgeneric identity-value (object))
 
-(defmacro defm-monoid-genop (gen-name args identity-value
+(defparameter *monoid-binary-format* "~a-gbin")
+
+(defmacro defm-monoid-genop (gen-name identity-value
                              &key
                                (symbolic-name gen-name)
-                               (operator-name gen-name)
+                               (binary-name (format-symbol *monoid-binary-format* symbolic-name))
                                (docstring '())
                                (expression-superclass 'monoid-expression)
                                (exp-class-name (format-symbol *exp-class-format* symbolic-name))
-                               (exp-maker t)
                                (exp-maker-name (format-symbol *exp-maker-format* symbolic-name))
-                               (extra-exp-slots '()))
+                               (extra-exp-slots '())
+                               (sorter #'identity)
+                               (merger #'nconc))
   (eval-once (identity-value)
     `(progn
-       (defmgenop ,gen-name ,args
-         :symbolic-name ,symbolic-name
-         :operator-name ,operator-name
-         :docstring ,docstring
-         :expression-superclass ,expression-superclass
-         :exp-class-name ,exp-class-name
-         :exp-maker ,exp-maker
-         :exp-maker-name ,exp-maker-name
-         :extra-exp-slots ((identity-value :allocation :class
-                                           :reader identity-value
-                                           :initform ,identity-value)
-                           ,@extra-exp-slots))
+       (defun ,gen-name (&rest operands)
+         (if (null (cdr operands))
+             (car operands)
+             (reduce #',binary-name (funcall ,sorter operands))))
+          
+       (defmgenop ,binary-name (x y)
+                  :symbolic-name ,symbolic-name
+                  :operator-name ,gen-name
+                  :docstring ,docstring
+                  :expression-superclass ,expression-superclass
+                  :exp-class-name ,exp-class-name
+                  :exp-maker nil
+                  :extra-exp-slots ((identity-value :allocation :class
+                                                    :reader identity-value
+                                                    :initform ,identity-value)
+                                    ,@extra-exp-slots))
+
+       (defun ,exp-maker-name (&rest operands)
+         (make-instance ',exp-class-name :operands operands))
+
+       (defmethod ,binary-name ((x ,exp-class-name) (y ,exp-class-name))
+         (reduce #',binary-name (funcall ,merger (operands x) (operands y))))
+
+       (defmethod ,binary-name ((x ,exp-class-name) y)
+         (let ((last-xop (car (last (operands x)))))
+           (if (g/= (funcall ,sorter (list last-xop y))
+                    (list last-xop y))
+               (let ((tmp (,binary-name last-xop y)))
+                 (if (g/= tmp (,exp-maker-name last-xop y))
+                     (apply #',exp-maker-name (append (operands x) (list y)))
+                     (reduce #',binary-name (funcall ,merger (butlast (operands x)) (list tmp)))))
+               (,binary-name y x))))
+
+       (defmethod ,binary-name (x (y ,exp-class-name))
+         (reduce #',binary-name (funcall ,merger (list x) (operands y))))
+
+       (defmethod ,binary-name (x (y expression))
+         (,exp-maker-name x y))
 
        (defmethod identity-value ((symbol (eql ',symbolic-name))) ,identity-value))))
