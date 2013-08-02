@@ -146,12 +146,11 @@
   `(let ((recompile-required
           (add-patterns-to-table *expr-pattern-specs* ',simp-specs)))
      (iter (for expr-sym in recompile-required)
-           (let ((expression-type (expression-class expr-sym)))
-             (let ((compiled-simplifier
-                    (make-pm-simplifier (symbol-function expr-sym)
-                                        t
-                                        (gethash expr-sym *expr-pattern-specs*))))
-               (setf (gethash expr-sym *expr-compiled-pattern-simplifiers*) compiled-simplifier))))))
+           (let ((compiled-simplifier
+                  (make-pm-simplifier (symbol-function expr-sym)
+                                      t
+                                      (gethash expr-sym *expr-pattern-specs*))))
+             (setf (gethash expr-sym *expr-compiled-pattern-simplifiers*) compiled-simplifier)))))
 
 (defmethod simplify-exp :around ((expression expression))
   (let ((new-expression
