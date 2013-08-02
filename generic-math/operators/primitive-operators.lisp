@@ -12,46 +12,6 @@
 (defmethod g/*-gbin ((x number) (y number))
   (* x y))
 
-(add-simplifier-patterns
-  ((g/+ @as 0 @as)
-   (apply #'g/+ (apply #'append @as)))
-  ((g/+ @as ?x @as ?x @as)
-   (apply #'g/+ (g/* 2 ?x) (apply #'append @as)))
-  ((g/+ @as ?x @as (g/* @cs ?x @cs) @as)
-   (apply #'g/+
-          (g/* (g/+ 1 (apply #'g/* (apply #'append @cs))) ?x)
-          (apply #'append @as)))
-  ((g/+ @as (g/* @cs ?x @cs) @as ?x @as)
-   (apply #'g/+
-          (g/* (g/+ 1 (apply #'g/* (apply #'append @cs))) ?x)
-          (apply #'append @as)))
-  ((g/+ @as (g/* @cs ?x @cs) @as (g/* @ds ?x @ds) @as)
-   (apply #'g/+
-          (g/* (g/+ (apply #'g/* (apply #'append @cs))
-                    (apply #'g/* (apply #'append @ds))) ?x)
-          (apply #'append @as))))
-
-(add-simplifier-patterns
-  ((g/* @as 0 @as) 0)
-  ((g/* @as 1 @as)
-   (apply #'g/* (apply #'append @as)))
-  ((g/* @as ?x @as ?x @as)
-   (apply #'g/*
-          (g/expt ?x 2)
-          (apply #'append @as)))
-  ((g/* @as ?x @as (g/expt ?x ?y) @as)
-   (apply #'g/*
-          (g/expt ?x (g/+ 1 ?y))
-          (apply #'append @as)))
-  ((g/* @as (g/expt ?x ?y) @as ?x @as)
-   (apply #'g/*
-          (g/expt ?x (g/+ 1 ?y))
-          (apply #'append @as)))
-  ((g/* @as (g/expt ?x ?y) @as (g/expt ?x ?z) @as)
-   (apply #'g/*
-          (g/expt ?x (g/+ ?y ?z))
-          (apply #'append @as))))
-
 ;; Binary operators
 
 (defmgenop g/expt (base exponent))
@@ -65,14 +25,6 @@
   (make-g/expt-expr base exponent))
 (defmethod g/expt ((base number) (exponent expression))
   (make-g/expt-expr base exponent))
-
-(add-simplifier-patterns
-  ((g/expt ?x 1) ?x)
-  ((g/expt ?x 0) 1)
-  ((g/expt 1 ?x) 1)
-  ((g/expt 0 ?x) 0)
-  ((g/expt (g/expt ?x ?y) ?z)
-   (g/expt ?x (g/* ?y ?z))))
 
 ;; Inverse abelian operators
 
@@ -92,13 +44,6 @@
 
 (defm-prim-unary-genop g/sin sin angle)
 (defm-prim-unary-genop g/cos cos angle)
-
-(add-simplifier-patterns
-  ((g/+ @as (g/expt (g/cos ?x) 2) @as (g/expt (g/sin ?x) 2) @as)
-   (apply #'g/+ 1 (apply #'append @as)))
-  ((g/+ @as (g/expt (g/sin ?x) 2) @as (g/expt (g/cos ?x) 2) @as)
-   (apply #'g/+ 1 (apply #'append @as))))
-
 (defm-prim-unary-genop g/tan tan angle)
 (defm-prim-unary-genop g/asin asin number)
 (defm-prim-unary-genop g/acos acos number)

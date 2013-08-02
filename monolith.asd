@@ -17,6 +17,7 @@
                                                            (:file "abelian-operators")
                                                            (:file "primitive-operators")
                                                            (:file "supplemental-operators")
+                                                           (:file "simplification-patterns")
                                                            (:file "derivative")))))
                (:file "matrix" :depends-on ("generic-math"))
                (:module "numerics" :depends-on ("matrix")
