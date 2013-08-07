@@ -2,7 +2,7 @@
   :description "monolith: a mathematical library for common lisp."
   :version "0.3"
   :author "YL"
-  :depends-on (:iterate :water :phractal)
+  :depends-on (:iterate :water :phractal :lla)
   :serial t
   :components ((:file "packages")
                (:module "generic-math"

@@ -367,7 +367,7 @@
 
 (defmethod g/*-gbin ((m1 numeric-matrix) (m2 numeric-matrix))
     (sequence->matrix
-     (inner (elements m1) (elements m2) #'* #'+)
+     (mm (elements m1) (elements m2))
      :element-type 'number))
 
 (defmethod g/*-gbin ((m1 row-matrix) (m2 col-matrix))
@@ -378,14 +378,4 @@
   m1)
 
 (defmethod g/*-gbin ((m1 array) (m2 array))
-  (cond
-    ((and (col-matrix-p m1)
-          (col-matrix-p m2))
-     (reduce #'+ (map 'list #'* m1 m2)))
-    ((and (row-matrix-p m1)
-          (col-matrix-p m2))
-     (reduce #'+ (map 'list #'*
-                      (iter (for i from 0 to (1- (cols m1)))
-                            (collect (matrix-ij m1 0 i)))
-                      (elements m2))))
-    (t (inner m1 m2 #'* #'+))))
+  (mm m1 m2))
