@@ -26,8 +26,8 @@
                                (exp-class-name (format-symbol *exp-class-format* symbolic-name))
                                (exp-maker-name (format-symbol *exp-maker-format* symbolic-name))
                                (extra-exp-slots '())
-                               (sorter #'identity)
-                               (merger #'nconc))
+                               (sorter '#'identity)
+                               (merger '#'nconc))
   (eval-once (identity-value)
     `(progn
        (defun ,gen-name (&rest operands)
