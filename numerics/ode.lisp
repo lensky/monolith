@@ -41,17 +41,17 @@
     (loop for i from 0 to (1- nks)
        for a = (elt as i)
        for c = (aref cs i)
-       for ki = (g/* step
+       for ki = (m* step
                      (funcall
                       f
                       (+ ti (* step c))
-                      (g/+ yi (g/* (transpose ks) a))))
+                      (g/+ yi (m* (transpose ks) a))))
        do
          (setf (matrix-row ks i) ki))
     (transpose ks)))
 
 (defun rk-step (yi bs ks)
-  (g/+ yi (g/* ks bs)))
+  (g/+ yi (m* ks bs)))
 
 (defun adjust-rk-step (step err tol order)
   (if (= 0 err)

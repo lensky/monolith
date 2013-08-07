@@ -338,6 +338,11 @@
 (defmethod g/*-gbin ((x number) (y numeric-matrix))
   (matrix-apply-elementwise (lambda (n) (* x n)) y))
 
+(defm-monoid-genop m* 1)
+
+(defmethod m*-gbin (x y)
+  (g/* x y))
+
 (defun inner (m1 m2 &optional (multiplication-fn #'g/*) (addition-fn #'g/+))
   (let ((rows1 (rows m1))
         (rows2 (rows m2))
@@ -361,21 +366,21 @@
           result)
         nil)))
 
-(defmethod g/*-gbin ((m1 matrix) (m2 matrix))
+(defmethod m*-gbin ((m1 matrix) (m2 matrix))
   (sequence->matrix
    (inner (elements m1) (elements m2))))
 
-(defmethod g/*-gbin ((m1 numeric-matrix) (m2 numeric-matrix))
+(defmethod m*-gbin ((m1 numeric-matrix) (m2 numeric-matrix))
     (sequence->matrix
      (mm (elements m1) (elements m2))
      :element-type 'number))
 
-(defmethod g/*-gbin ((m1 row-matrix) (m2 col-matrix))
+(defmethod m*-gbin ((m1 row-matrix) (m2 col-matrix))
   (reduce #'g/+ (map 'list #'g/* (elements m1) (elements m2))))
 
-(defmethod g/*-gbin ((m1 col-matrix) (m2 row-matrix))
+(defmethod m*-gbin ((m1 col-matrix) (m2 row-matrix))
   (setf (elements m1) (map 'vector #'g/* (elements m1) (elements m2)))
   m1)
 
-(defmethod g/*-gbin ((m1 array) (m2 array))
+(defmethod m*-gbin ((m1 array) (m2 array))
   (mm m1 m2))
