@@ -2,5 +2,7 @@
   (:use #:cl
         #:water
         #:phractal
+        #:phractal.pattern-matching
         #:iterate
-        #:lla))
+        #:lla
+        #:let-plus))

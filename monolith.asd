@@ -2,14 +2,16 @@
   :description "monolith: a mathematical library for common lisp."
   :version "0.3"
   :author "YL"
-  :depends-on (:iterate :water :phractal :lla)
+  :depends-on (:iterate :water :phractal :lla :let-plus)
   :serial t
   :components ((:file "packages")
                (:module "generic-math"
                         :components ((:file "expressions")
                                      (:module "simplification" :depends-on ("expressions")
                                               :components ((:file "simplification")
-                                                           (:file "pattern-simplifier")))
+                                                           (:file "pattern-parser")
+                                                           (:file "pattern-simplifier"
+                                                                  :depends-on ("pattern-parser"))))
                                      (:module "operators" :depends-on ("expressions" "simplification")
                                               :serial t
                                               :components ((:file "operators")

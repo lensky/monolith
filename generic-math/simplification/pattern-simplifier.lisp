@@ -1,78 +1,45 @@
 (in-package #:monolith)
 
-(defclass m-expression-pat ()
+(defclass c-m-expr (combinator)
   ((operator-name :reader operator-name
                   :initarg :operator-name)
-   (operands-matcher :reader operands-matcher
-                     :initarg :operands-matcher)))
+   (operands-combinators :reader operands-combinators
+                     :initarg :operands-combinators)))
 
-(defun exp-pat (operator-name &rest operand-pats)
-  (make-instance 'm-expression-pat
+(defun exp-pat (operator-name operand-combs)
+  (make-instance 'c-m-expr
+                 :succeed *id-succeed*
+                 :fail (make-simple-fail 'r '`(format nil "Failed to match expr: ~a." ,r))
                  :operator-name operator-name
-                 :operands-matcher
-                 (compile-pattern (apply #'list-pat (gensym) operand-pats))))
+                 :operands-combinators operand-combs))
 
-(defmethod compile-pattern ((pattern m-expression-pat))
-  (make-pattern-compiler (pattern unmatched bindings fail
-                          :state-vars (op-match-gen))
-      (null op-match-gen)
-    (t
-     `(cond
-        (op-match-gen
-         (let ((op-res (funcall op-match-gen)))
-           (if (pattern-false-p op-res)
-               (progn
-                 (setf op-match-gen nil)
-                 (fail))
-               (cons (cdr unmatched) (cdr op-res)))))
-        ((< (length unmatched) 1)
-         (setf op-match-gen nil)
-         (fail))
-        (t
-         (let ((expression (car unmatched)))
-           (if (and (expressionp expression)
-                    (eq ',(operator-name pattern) (operator-name expression)))
-               (setf op-match-gen
-                     (funcall ,(operands-matcher pattern)
-                              (single-value-matcher (list (operands expression))
-                                                    bindings)))
-               (setf op-match-gen nil))
-           (fail)))))))
-
-(defparameter *pattern-prefix->object*
-  `((#\? . ,(lambda (name) `(atomic ',name :single-valued t)))
-    (#\@ . ,(lambda (name) `(listing ',name :single-valued nil)))
-    (#\$ . ,(lambda (name) `(listing ',name :single-valued t))))
-  "List linking prefixes to appropiate constructors.")
+(def-comb->lisp (c-m-expr input state succeed fail
+                          :vars (fail-immediately c-gen c-res))
+  (let ((operands-comb (compile-combinator (apply #'make-list-pat (operands-combinators c-m-expr))))
+        (operator-name (operator-name c-m-expr)))
+    `(let ((,fail-immediately (or (not (subtypep (type-of ,input) 'expression))
+                                  (not (eq ',operator-name (operator-name ,input))))))
+       (let ((,c-gen (unless ,fail-immediately
+                       (funcall ,operands-comb (operands ,input) ,state))))
+         (lambda ()
+           (if (not ,fail-immediately)
+               (let ((,c-res (funcall ,c-gen)))
+                 (if (c-success-p ,c-res)
+                     (,succeed (value ,c-res) (remainder ,c-res) (state ,c-res))
+                     (,fail ,c-res ,state)))
+               (,fail ,input ,state)))))))
 
 (defun tree-find (tree predicate)
   (if (listp tree)
       (mappend (lambda (x) (tree-find x predicate)) tree)
       (if (funcall predicate tree) (list tree) nil)))
 
-(defun pattern-symbol->pattern-var (symbol)
-  (funcall (cdr
-            (assoc
-             (char (symbol-name symbol) 0)
-             *pattern-prefix->object*))
-           symbol))
-
-(defun pattern-symbol->let-statement (symbol)
-  (list symbol (pattern-symbol->pattern-var symbol)))
-
 (defun get-simp-pattern-vars (symbolic-pat)
   (remove-duplicates
    (tree-find symbolic-pat
               (lambda (x)
-                (and
-                 (symbolp x)
-                 (member (char (symbol-name x) 0)
-                         (mapcar #'car *pattern-prefix->object*)))))))
-
-(defun surround-with-pat-env (&rest body)
-  `(let (,@(mapcar #'pattern-symbol->let-statement
-                   (mappend (lambda (s) (get-simp-pattern-vars s)) body)))
-     ,@body))
+                (or (listing-var-p x)
+                    (atomic-var-p x))))))
 
 (defun surround-with-match-env (bindings &rest body)
   (let ((syms-to-bind (mappend (lambda (s) (get-simp-pattern-vars s)) body)))
@@ -80,30 +47,27 @@
         (with-gensyms (bs)
           `(let ((,bs ,bindings))
              (let (,@(mapcar (lambda (symbol)
-                               (let ((var (eval (pattern-symbol->pattern-var symbol))))
-                                 `(,symbol ,(compile-get-binding-val var bs))))
+                               (let ((var symbol))
+                                 `(,symbol (cdr (assoc ',var ,bs)))))
                              syms-to-bind))
                ,@body)))
         `(progn ,@body))))
 
 (defun compile-simplifier-pat (symbolic-pat)
-  (eval
-   (labels ((add-exp-pat (x)
-              (if (listp x)
-                  (append `(exp-pat ',(car x)) (mapcar #'add-exp-pat (cdr x)))
-                  x)))
-     (let ((with-exp-pat (mapcar #'add-exp-pat symbolic-pat)))
-       (surround-with-pat-env `(compile-pattern (list-pat ',(gensym) ,@with-exp-pat)))))))
+  (let ((sym-mod (cons (gensym) symbolic-pat)))
+   (compile-combinator
+    (apply #'make-list-pat
+           (operands-combinators (pattern->comb sym-mod))))))
 
 (defun single-pattern-simplifier (simp-spec auto-simplify)
   (destructuring-bind (pat action &key (auto-simplify auto-simplify)) simp-spec
     (let ((compiled-pat (compile-simplifier-pat pat)))
       (with-gensyms (operands match new-exp)
         `(lambda (,operands)
-           (let ((,match (funcall (funcall ,compiled-pat (single-value-matcher (list ,operands))))))
-             (if (pattern-false-p ,match)
+           (let ((,match (funcall (funcall ,compiled-pat ,operands '()))))
+             (if (c-failure-p ,match)
                  (cons ,operands nil)
-                 (let ((,new-exp ,(surround-with-match-env `(cdr ,match) action)))
+                 (let ((,new-exp ,(surround-with-match-env `(state ,match) action)))
                    (cons ,(if auto-simplify `(simplify-exp ,new-exp) new-exp) t)))))))))
 
 (defun make-pm-simplifier (op-fn auto-simplify simp-specs)
@@ -115,16 +79,15 @@
                               ',simp-specs)))
                  (lambda (operands)
                    (let ((,matched-p nil)
-                         (,res nil)
                          (,new-operands operands))
                      (do* ((,fn-list ,compiled-simps (cdr ,fn-list))
                            (,fn (car ,fn-list) (car ,fn-list)))
                           ((or (null ,fn) ,matched-p)
                            (if ,matched-p
                                ,new-operands (apply ,op-fn ,new-operands)))
-                       (setf ,res (funcall ,fn ,new-operands))
-                       (setf ,matched-p (cdr ,res))
-                       (setf ,new-operands (car ,res))))))))))
+                       (let ((,res (funcall ,fn ,new-operands)))
+                         (setf ,matched-p (cdr ,res))
+                         (setf ,new-operands (car ,res)))))))))))
 
 (defvar *expr-pattern-specs* (make-hash-table))
 (defvar *expr-compiled-pattern-simplifiers* (make-hash-table))
