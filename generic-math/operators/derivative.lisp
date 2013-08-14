@@ -54,6 +54,8 @@
   ((g/cos u) (g/- (g/sin u)))
   ((g/sin u) (g/cos u))
   ((g/tan u) (g/expt (g/sec u) 2))
+  ((g/sec u) (g/* (g/sin u) (g/expt (g/cos u) -2)))
+  ((g/csc u) (g/* -1 (g/cos u) (g/expt (g/sin u) -2)))
   ((g/asin u) (g// (g/sqrt (g/- 1 (g/expt u 2)))))
   ((g/acos u) (g/- (g// (g/* (g/abs u) (g/sqrt (g/- (g/expt u 2) 1))))))
   ((g/sqrt u) (g/* 1/2 (g// (g/sqrt u))))

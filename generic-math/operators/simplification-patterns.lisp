@@ -72,4 +72,8 @@
 (add-abelian-patterns (:duplicate-asymmetric t)
   ((g/* (g/tan ?x) (g/cos ?x)) (g/sin ?x))
   ((g/* (g/cot ?x) (g/sin ?x)) (g/cos ?x))
+  ((g/* (g/cos ?x) (g/sec ?x)) 1)
+  ((g/* (g/sin ?x) (g/csc ?x)) 1)
+  ((g/* (g/cos ?x) (g/csc ?x)) (g// (g/tan ?x)))
+  ((g/* (g/sin ?x) (g/sec ?x)) (g/tan ?x))
   ((g/+ (g/expt (g/cos ?x) 2) (g/expt (g/sin ?x) 2)) 1))
