@@ -1,5 +1,34 @@
 (in-package #:monolith)
 
+(defclass c-m-expr (combinator)
+  ((operator-name :reader operator-name
+                  :initarg :operator-name)
+   (operands-combinators :reader operands-combinators
+                     :initarg :operands-combinators)))
+
+(defun exp-pat (operator-name operand-combs)
+  (make-instance 'c-m-expr
+                 :succeed *id-succeed*
+                 :fail (make-simple-fail 'r '`(format nil "Failed to match expr: ~a." ,r))
+                 :operator-name operator-name
+                 :operands-combinators operand-combs))
+
+(def-comb->lisp (c-m-expr input state succeed fail
+                          :vars (fail-immediately c-gen c-res))
+  (let ((operands-comb (compile-combinator (apply #'make-list-pat (operands-combinators c-m-expr))))
+        (operator-name (operator-name c-m-expr)))
+    `(let ((,fail-immediately (or (not (subtypep (type-of ,input) 'expression))
+                                  (not (eq ',operator-name (operator-name ,input))))))
+       (let ((,c-gen (unless ,fail-immediately
+                       (funcall ,operands-comb (operands ,input) ,state))))
+         (lambda ()
+           (if (not ,fail-immediately)
+               (let ((,c-res (funcall ,c-gen)))
+                 (if (c-success-p ,c-res)
+                     (,succeed (value ,c-res) (remainder ,c-res) (state ,c-res))
+                     (,fail ,c-res ,state)))
+               (,fail ,input ,state)))))))
+
 (defun listing-var-p (x)
   (and (symbolp x)
        (eq (char (symbol-name x) 0) #\@)))
