@@ -10,7 +10,7 @@
      (let ((new-operands (remove-identity (operands expression))))
        (cond
          ((null new-operands) identity-value)
-         ((null (cdr new-operands)) (car new-operands))
+         ((null (cdr new-operands)) (simplify-exp (car new-operands)))
          (t (call-next-method (apply (operator expression) new-operands))))))))
 
 (defgeneric identity-value (object))
