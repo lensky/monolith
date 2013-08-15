@@ -84,10 +84,10 @@
              (make-or-comb
               (list *literal-comb*
                     *atomic-single-var-comb*
-                    *listing-var-comb*
-                    *sub-expr-comb*)
+                    *listing-var-comb*)
               *id-succeed*
-              *id-fail*)
+              *id-fail*
+              :recursive-combinators (list *sub-expr-comb*))
              *id-succeed*
              *id-fail*)))
 
