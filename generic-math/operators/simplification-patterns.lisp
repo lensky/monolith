@@ -77,3 +77,8 @@
   ((g/* (g/cos ?x) (g/csc ?x)) (g// (g/tan ?x)))
   ((g/* (g/sin ?x) (g/sec ?x)) (g/tan ?x))
   ((g/+ (g/expt (g/cos ?x) 2) (g/expt (g/sin ?x) 2)) 1))
+
+;; Other identities
+
+(add-simplifier-patterns
+  ((g/log (g/exp ?x)) ?x))

@@ -1,33 +1,16 @@
 (in-package #:monolith)
 
-(defclass c-m-expr (combinator)
-  ((operator-name :reader operator-name
-                  :initarg :operator-name)
-   (operands-combinators :reader operands-combinators
-                     :initarg :operands-combinators)))
+(defcombinator c-mexpr (operator-name operands-combinator)
+    (input state succeed fail)
+  (if (or (not (subtypep (type-of input) 'expression))
+          (not (eq operator-name (operator-name input))))
+      (fail)
+      (if-c-success (operands-combinator (operands input) state) result
+        (succeed (value result) (remainder result) (state result))
+        (signal result))))
 
-(defun exp-pat (operator-name operand-combs)
-  (make-instance 'c-m-expr
-                 :succeed *id-succeed*
-                 :fail (make-simple-fail 'r '`(format nil "Failed to match expr: ~a." ,r))
-                 :operator-name operator-name
-                 :operands-combinators operand-combs))
-
-(def-comb->lisp (c-m-expr input state succeed fail
-                          :vars (fail-immediately c-gen c-res))
-  (let ((operands-comb (compile-combinator (apply #'make-list-pat (operands-combinators c-m-expr))))
-        (operator-name (operator-name c-m-expr)))
-    `(let ((,fail-immediately (or (not (subtypep (type-of ,input) 'expression))
-                                  (not (eq ',operator-name (operator-name ,input))))))
-       (let ((,c-gen (unless ,fail-immediately
-                       (funcall ,operands-comb (operands ,input) ,state))))
-         (lambda ()
-           (if (not ,fail-immediately)
-               (let ((,c-res (funcall ,c-gen)))
-                 (if (c-success-p ,c-res)
-                     (,succeed (value ,c-res) (remainder ,c-res) (state ,c-res))
-                     (,fail ,c-res ,state)))
-               (,fail ,input ,state)))))))
+(defun expr-pat (operator-name operand-combinators)
+  (with-id-success (c-mexpr operator-name (apply #'make-list-pat operand-combinators))))
 
 (defun listing-var-p (x)
   (and (symbolp x)
@@ -41,78 +24,67 @@
   (numberp x))
 
 (defparameter *listing-var-comb*
-  (make-instance 'c-predicate
-                 :predicate #'listing-var-p
-                 :combinator *basic-list-terminal*
-                 :succeed (lambda (v r s)
-                            (declare (ignore r s))
-                            (make-listing-var v))
-                 :fail *id-fail*))
+  (funcall
+   (c-predicate #'listing-var-p (with-id-success c-list-terminal))
+   (lambda (v s)
+     (declare (ignore s))
+     (make-listing-var v))))
 
 (defparameter *atomic-single-var-comb*
-  (make-instance 'c-predicate
-                 :predicate #'atomic-var-p
-                 :combinator *basic-list-terminal*
-                 :succeed (lambda (v r s)
-                            (declare (ignore r s))
-                            (make-atomic-single-var v))
-                 :fail *id-fail*))
+  (funcall
+   (c-predicate #'atomic-var-p (with-id-success c-list-terminal))
+   (lambda (v s)
+     (declare (ignore s))
+     (make-atomic-single-var v))))
 
 (defparameter *literal-comb*
-  (make-instance 'c-predicate
-                 :predicate #'literal-p
-                 :combinator *basic-list-terminal*
-                 :succeed (lambda (v r s)
-                            (declare (ignore r s))
-                            (make-literal-var v))
-                 :fail *id-fail*))
+  (funcall
+   (c-predicate #'literal-p (with-id-success c-list-terminal))
+   (lambda (v s)
+     (declare (ignore s))
+     (make-literal-var v))))
 
+;; ADD RECURSION
 (defparameter *sub-expr-comb*
-  (make-sublist-comb '()
-                     (lambda (lst remainder state)
-                       (declare (ignore remainder state))
-                       (let+ (((&ign expr-name combinators &ign) lst))
-                         (make-list-term-comb-comb
-                          (exp-pat expr-name combinators)
-                          *id-succeed*
-                          *id-fail*)))
-                     *id-fail*))
-
-(setf (slot-value *sub-expr-comb* 'combinators)
-      (list *basic-list-terminal*
-            (make-star-comb
-             (make-or-comb
-              (list *literal-comb*
-                    *atomic-single-var-comb*
-                    *listing-var-comb*)
-              *id-succeed*
-              *id-fail*
-              :recursive-combinators (list *sub-expr-comb*))
-             *id-succeed*
-             *id-fail*)))
+  (funcall
+   (c-sublist
+    (with-id-success
+        (c-list
+         (mapcar #'with-id-success
+                 (list
+                  c-list-terminal
+                  (c-star
+                   (with-id-success
+                       (c-or
+                        (list
+                         *literal-comb*
+                         *atomic-single-var-comb*
+                         *listing-var-comb*
+                         'sub-expr-comb))))))))
+    :recursive-name 'sub-expr-comb)
+   (lambda (lst s)
+     (declare (ignore s))
+     (let+ (((&ign expr-name combinators &ign) lst))
+       (with-id-success
+           (c-sublist (expr-pat expr-name combinators)))))))
 
 (defparameter *expr-comb*
-  (make-list-comb (list *basic-list-terminal*
-                        (make-star-comb
-                         (make-or-comb
-                          (list *literal-comb*
-                                *atomic-single-var-comb*
-                                *listing-var-comb*
-                                *sub-expr-comb*)
-                          *id-succeed*
-                          *id-fail*)
-                         *id-succeed*
-                         *id-fail*))
-                  (lambda (lst remainder state)
-                    (declare (ignore remainder state))
-                    (let+ (((&ign expr-name combinators &ign) lst))
-                      (exp-pat expr-name combinators)))
-                  *id-fail*))
-
-(defparameter *simp-pattern-parser* (compile-combinator *expr-comb*))
+  (funcall
+   (c-list
+    (list
+     (with-id-success
+         (c-star
+          (with-id-success
+              (c-or
+               (list
+                *literal-comb*
+                *atomic-single-var-comb*
+                *listing-var-comb*
+                *sub-expr-comb*)))))))
+   (lambda (lst s)
+     (declare (ignore s))
+     (let+ (((&ign combinators &ign) lst))
+       (c-list combinators)))))
 
 (defun pattern->comb (pattern)
-  (let ((result (funcall (funcall *simp-pattern-parser* pattern '()))))
-    (if (c-success-p result)
-        (value result)
-        result)))
+  (first-value *expr-comb* pattern '()))

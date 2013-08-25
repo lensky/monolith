@@ -13,35 +13,30 @@
                     (atomic-var-p x))))))
 
 (defun compile-simplifier-pat (symbolic-pat action auto-simplify)
-  (let ((sym-mod (cons 'placeholder symbolic-pat)))
-    (compile-combinator
-     (make-list-comb (operands-combinators (pattern->comb sym-mod))
-                     (let ((syms-to-bind (get-simp-pattern-vars action))
-                           (action-exp (if auto-simplify
-                                           `(simplify-exp ,action)
-                                           action)))
-                       (if syms-to-bind
-                           (compile
-                            nil
-                            (with-gensyms (v r s)
-                              `(lambda (,v ,r ,s)
-                                 (declare (ignore ,v ,r))
-                                 (let (,@(mapcar
-                                          (lambda (symbol)
-                                            `(,symbol (cdr (assoc ',symbol ,s))))
-                                          syms-to-bind))
-                                   ,action-exp))))
-                           (with-gensyms (v r s)
-                             `((,v ,r ,s)
-                               (declare (ignore ,v ,r ,s))
-                               ,action-exp))))
-                     *id-fail*))))
+  (funcall (pattern->comb symbolic-pat)
+           (let ((syms-to-bind (get-simp-pattern-vars action))
+                 (action-exp (if auto-simplify
+                                 `(simplify-exp ,action)
+                                 action)))
+             (compile
+              nil
+              (with-gensyms (v s)
+                `(lambda (,v ,s)
+                   ,@(if syms-to-bind
+                         `((declare (ignore ,v))
+                           (let (,@(mapcar
+                                    (lambda (symbol)
+                                      `(,symbol (cdr (assoc ',symbol ,s))))
+                                    syms-to-bind))
+                             ,action-exp))
+                         `((declare (ignore ,v ,s))
+                           ,action-exp))))))))
 
 (defun single-pattern-simplifier (simp-spec auto-simplify)
   (destructuring-bind (pat action &key (auto-simplify auto-simplify)) simp-spec
     (let ((compiled-pat (compile-simplifier-pat pat action auto-simplify)))
       (lambda (operands)
-        (funcall (funcall compiled-pat operands '()))))))
+        (first-value compiled-pat operands '())))))
 
 (defun make-pm-simplifier (op-fn simp-specs auto-simplify)
   (let ((compiled-simps
@@ -52,8 +47,7 @@
       (or
        (iter (for simp in compiled-simps)
              (for match = (funcall simp operands))
-             (if (c-success-p match)
-                 (leave (value match))))
+             (if match (leave match)))
        (apply op-fn operands)))))
 
 (defvar *expr-pattern-specs* (make-hash-table))

@@ -5,6 +5,7 @@
         #:water.collection
         #:water.g/=
         #:phractal
+        #:phractal.list-utils
         #:phractal.pattern-matching
         #:iterate
         #:lla
