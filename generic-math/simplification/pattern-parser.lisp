@@ -5,9 +5,8 @@
   (if (or (not (subtypep (type-of input) 'expression))
           (not (eq operator-name (operator-name input))))
       (fail)
-      (if-c-success (operands-combinator (operands input) state) result
-        (succeed (value result) (remainder result) (state result))
-        (signal result))))
+      (let ((result (call-combinator operands-combinator (operands input) state)))
+        (succeed (value result) (remainder result) (state result)))))
 
 (defun expr-pat (operator-name operand-combinators)
   (with-id-success (c-mexpr operator-name (apply #'make-list-pat operand-combinators))))

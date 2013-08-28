@@ -13,7 +13,7 @@
                     (atomic-var-p x))))))
 
 (defun compile-simplifier-pat (symbolic-pat action auto-simplify)
-  (funcall (pattern->comb symbolic-pat)
+  (funcall (value (pattern->comb symbolic-pat))
            (let ((syms-to-bind (get-simp-pattern-vars action))
                  (action-exp (if auto-simplify
                                  `(simplify-exp ,action)
@@ -47,7 +47,7 @@
       (or
        (iter (for simp in compiled-simps)
              (for match = (funcall simp operands))
-             (if match (leave match)))
+             (if match (leave (value match))))
        (apply op-fn operands)))))
 
 (defvar *expr-pattern-specs* (make-hash-table))
